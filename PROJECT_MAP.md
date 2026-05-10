@@ -78,7 +78,7 @@ hdc/skill_loader.py ──────┘
 
 - **LLM**: Defaults to `ollama_llm` with `qwen2.5-coder:7b` (configurable)
 - **ASR**: Defaults to `sherpa_onnx_asr` (SenseVoice)
-- **TTS**: Defaults to `edge_tts` (en-US-AvaMultilingualNeural)
+- **TTS**: Defaults to `edge_tts` with `ar-EG-SalmaNeural` (Egyptian Arabic, female)
 - **VAD**: Disabled by default (`null`), Silero VAD configured
 
 ## Git Branches
@@ -89,7 +89,7 @@ hdc/skill_loader.py ──────┘
 ## Orphans & Pending
 
 ### Deferred Features
-- **Arabic TTS voice** — not configured yet. Current TTS uses `en-US-AvaMultilingualNeural`. Should switch to e.g. `ar-EG-SalmaNeural` when Arabic voice output is needed.
+- **Arabic TTS voice** — configured: `ar-EG-SalmaNeural` (Edge TTS, Egyptian Arabic female). Local-only change in gitignored `conf.yaml`.
 - **Arabic ASR optimization** — not configured yet. Current ASR uses SenseVoice (multilingual, supports Arabic).
 - **Desktop pet/window mode** — not finalized yet. Overlay/standalone companion window is a future enhancement.
 
