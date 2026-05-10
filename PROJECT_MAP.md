@@ -85,6 +85,15 @@ hdc/skill_loader.py ──────┘
 
 - `main` — production branch with HDC customizations
 - `backup-hossam-desk-companion-initial` — clean v1.2.1 backup at commit `3afa410`
+- `feature/gemini-live-lab-import` — Gemini Live Voice Lab (isolated)
+
+## Gemini Live Voice Lab
+- Imported under `labs/gemini-live-voice-lab/`
+- Isolated from main Open-LLM-VTuber app
+- Uses local WebSocket bridge (`/ws/gemini-live`)
+- `GEMINI_API_KEY` remains backend-only
+- Not merged into main voice flow yet
+- Future task: connect lab voice events to avatar states
 
 ## Orphans & Pending
 
