@@ -89,7 +89,7 @@ hdc/skill_loader.py ──────┘
 ## Orphans & Pending
 
 ### Deferred Features
-- **Arabic TTS voice** — configured: `ar-EG-SalmaNeural` (Edge TTS, Egyptian Arabic female). Local-only change in gitignored `conf.yaml`.
+- **Arabic TTS voice** — configured: `ar-EG-SalmaNeural` (Edge TTS, Egyptian Arabic female). Local-only change in gitignored `conf.yaml`. See `docs/LOCAL_ARABIC_TTS_CONFIG.md`.
 - **Arabic ASR optimization** — not configured yet. Current ASR uses SenseVoice (multilingual, supports Arabic).
 - **Desktop pet/window mode** — not finalized yet. Overlay/standalone companion window is a future enhancement.
 
