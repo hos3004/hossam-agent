@@ -24,6 +24,8 @@ from .vad.vad_factory import VADFactory
 from .agent.agent_factory import AgentFactory
 from .translate.translate_factory import TranslateFactory
 
+from hdc.skill_loader import SkillLoader
+
 from .config_manager import (
     Config,
     AgentConfig,
@@ -36,6 +38,16 @@ from .config_manager import (
     read_yaml,
     validate_config,
 )
+
+
+_skill_loader = None
+
+def _get_skill_section() -> str:
+    global _skill_loader
+    if _skill_loader is None:
+        _skill_loader = SkillLoader()
+        _skill_loader.load_all()
+    return _skill_loader.build_skills_section()
 
 
 class ServiceContext:
@@ -463,6 +475,10 @@ class ServiceContext:
                 continue
 
             persona_prompt += prompt_content
+
+        skills_section = _get_skill_section()
+        if skills_section:
+            persona_prompt += "\n\n" + skills_section
 
         logger.debug("\n === System Prompt ===")
         logger.debug(persona_prompt)
