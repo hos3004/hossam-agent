@@ -1,19 +1,18 @@
 @echo off
-chcp 65001 > nul
 title Open-LLM-VTuber (Gemini Edition)
 setlocal
 cd /d "%~dp0"
 
 echo ============================================================
-echo   Open-LLM-VTuber   ^|   Gemini Edition
+echo   Open-LLM-VTuber  ^|  Gemini Edition
 echo ============================================================
 echo.
 
 REM ---- Check uv ----------------------------------------------------------
 where uv >nul 2>&1
 if errorlevel 1 (
-  echo [خطأ] أداة uv غير مثبتة.
-  echo ثبّتها بالأمر:
+  echo [ERROR] uv is not installed.
+  echo Install with:
   echo     powershell -c "irm https://astral.sh/uv/install.ps1 ^| iex"
   echo.
   pause
@@ -22,18 +21,18 @@ if errorlevel 1 (
 
 REM ---- Check conf.yaml ---------------------------------------------------
 if not exist "conf.yaml" (
-  echo [إعداد] إنشاء conf.yaml من القالب الافتراضي...
+  echo [SETUP] Creating conf.yaml from the default template...
   copy "config_templates\conf.default.yaml" "conf.yaml" >nul
-  echo [تنبيه] افتح conf.yaml وضع GEMINI_API_KEY في الأماكن المطلوبة.
+  echo [NOTICE] Open conf.yaml and put your GEMINI_API_KEY in the required slots.
   echo.
 )
 
 REM ---- Sync deps if needed ----------------------------------------------
 if not exist ".venv" (
-  echo [إعداد] تجهيز بيئة Python لأول مرة ^(قد يستغرق عدة دقائق^)...
+  echo [SETUP] Preparing Python venv for the first time ^(may take a few minutes^)...
   uv sync
   if errorlevel 1 (
-    echo [خطأ] فشل تجهيز البيئة.
+    echo [ERROR] Failed to set up the environment.
     pause
     exit /b 1
   )
@@ -45,16 +44,16 @@ start "" /b cmd /c "timeout /t 6 /nobreak >nul && start http://localhost:12393"
 
 echo.
 echo ------------------------------------------------------------
-echo   الواجهة:        http://localhost:12393
-echo   زر Live Mode:   يظهر بأسفل يمين الصفحة بعد التحميل
+echo   Web:           http://localhost:12393
+echo   Live Mode:     floating button (bottom-right of the page)
 echo.
-echo   اضغط Ctrl+C لإيقاف الخادم
+echo   Press Ctrl+C to stop the server.
 echo ------------------------------------------------------------
 echo.
 
 uv run run_server.py
 
 echo.
-echo [تم الإيقاف]
+echo [Stopped]
 pause
 endlocal
