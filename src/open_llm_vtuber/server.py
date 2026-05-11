@@ -119,17 +119,30 @@ class WebSocketServer:
             except FileNotFoundError:
                 return HTMLResponse("Frontend not built yet.", status_code=404)
 
+            # Cache-bust the overlay assets with each file's mtime so
+            # Electron/Chromium never serves a stale CSS/JS after we
+            # edit the source on disk.
+            def _v(path: str) -> str:
+                try:
+                    return str(int(os.path.getmtime(path)))
+                except OSError:
+                    return "0"
+
+            v_overlay = _v("live_mode_overlay/overlay.js")
+            v_css = _v("live_mode_overlay/companion.css")
+            v_init = _v("live_mode_overlay/companion-init.js")
+
             mode = request.query_params.get("mode")
             head_tags: list[str] = []
             body_tags: list[str] = [
-                '<script src="/live-mode-overlay/overlay.js" defer></script>'
+                f'<script src="/live-mode-overlay/overlay.js?v={v_overlay}" defer></script>'
             ]
             if mode == "companion":
                 head_tags.append(
-                    '<link rel="stylesheet" href="/live-mode-overlay/companion.css">'
+                    f'<link rel="stylesheet" href="/live-mode-overlay/companion.css?v={v_css}">'
                 )
                 body_tags.append(
-                    '<script src="/live-mode-overlay/companion-init.js" defer></script>'
+                    f'<script src="/live-mode-overlay/companion-init.js?v={v_init}" defer></script>'
                 )
 
             for tag in head_tags:
@@ -148,7 +161,13 @@ class WebSocketServer:
                 else:
                     html += "\n" + tag + "\n"
 
-            return HTMLResponse(html)
+            # Tell the browser not to cache the wrapper HTML itself,
+            # otherwise it might keep using yesterday's `?v=` query.
+            headers = {
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Pragma": "no-cache",
+            }
+            return HTMLResponse(html, headers=headers)
 
         # Initialize and include proxy routes if proxy is enabled
         system_config = config.system_config
