@@ -23,6 +23,7 @@ class BasicMemoryAgentConfig(I18nMixin, BaseModel):
         "lmstudio_llm",
         "openai_llm",
         "gemini_llm",
+        "gemini_native_llm",
         "zhipu_llm",
         "deepseek_llm",
         "groq_llm",
@@ -148,6 +149,38 @@ class HumeAIConfig(I18nMixin, BaseModel):
 # =================================
 
 
+class GeminiLiveConfig(I18nMixin, BaseModel):
+    """Configuration for the Gemini Live agent (real-time voice)."""
+
+    api_key: str = Field(..., alias="api_key")
+    model: str = Field("gemini-live-2.5-flash-preview", alias="model")
+    voice_name: str = Field("Aoede", alias="voice_name")
+    language_code: str = Field("ar-XA", alias="language_code")
+    idle_timeout: int = Field(30, alias="idle_timeout")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "api_key": Description(
+            en="Google AI Studio API key", zh="Google AI Studio API 密钥"
+        ),
+        "model": Description(
+            en="Gemini Live model (e.g. gemini-live-2.5-flash-preview)",
+            zh="Gemini Live 模型名称",
+        ),
+        "voice_name": Description(
+            en="Prebuilt voice name (Aoede, Kore, Puck, ...)",
+            zh="预置语音名称",
+        ),
+        "language_code": Description(
+            en="BCP-47 language code, e.g. ar-XA for Arabic",
+            zh="语言代码（如 ar-XA、en-US）",
+        ),
+        "idle_timeout": Description(
+            en="Seconds of inactivity before closing the live session",
+            zh="空闲断开秒数",
+        ),
+    }
+
+
 class LettaConfig(I18nMixin, BaseModel):
     """Configuration for the Letta agent."""
 
@@ -181,6 +214,9 @@ class AgentSettings(I18nMixin, BaseModel):
     mem0_agent: Optional[Mem0Config] = Field(None, alias="mem0_agent")
     hume_ai_agent: Optional[HumeAIConfig] = Field(None, alias="hume_ai_agent")
     letta_agent: Optional[LettaConfig] = Field(None, alias="letta_agent")
+    gemini_live_agent: Optional[GeminiLiveConfig] = Field(
+        None, alias="gemini_live_agent"
+    )
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "basic_memory_agent": Description(
@@ -193,6 +229,10 @@ class AgentSettings(I18nMixin, BaseModel):
         "letta_agent": Description(
             en="Configuration for Letta agent", zh="Letta 代理配置"
         ),
+        "gemini_live_agent": Description(
+            en="Configuration for Gemini Live agent (real-time voice)",
+            zh="Gemini Live 代理配置（实时语音）",
+        ),
     }
 
 
@@ -200,7 +240,11 @@ class AgentConfig(I18nMixin, BaseModel):
     """This class contains all of the configurations related to agent."""
 
     conversation_agent_choice: Literal[
-        "basic_memory_agent", "mem0_agent", "hume_ai_agent", "letta_agent"
+        "basic_memory_agent",
+        "mem0_agent",
+        "hume_ai_agent",
+        "letta_agent",
+        "gemini_live_agent",
     ] = Field(..., alias="conversation_agent_choice")
     agent_settings: AgentSettings = Field(..., alias="agent_settings")
     llm_configs: StatelessLLMConfigs = Field(..., alias="llm_configs")

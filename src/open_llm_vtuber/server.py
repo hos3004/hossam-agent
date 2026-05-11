@@ -11,10 +11,15 @@ import shutil
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import Response
+from starlette.responses import HTMLResponse, Response
 from starlette.staticfiles import StaticFiles as StarletteStaticFiles
 
-from .routes import init_client_ws_route, init_webtool_routes, init_proxy_route
+from .routes import (
+    init_client_ws_route,
+    init_live_mode_route,
+    init_proxy_route,
+    init_webtool_routes,
+)
 from .service_context import ServiceContext
 from .config_manager.utils import Config
 
@@ -96,6 +101,27 @@ class WebSocketServer:
         self.app.include_router(
             init_webtool_routes(default_context_cache=self.default_context_cache),
         )
+        # Dedicated WebSocket for Gemini Live Mode
+        self.app.include_router(
+            init_live_mode_route(default_context_cache=self.default_context_cache),
+        )
+
+        # Serve a modified index.html that injects the Live Mode overlay
+        # before falling through to the static `/` mount.
+        @self.app.get("/", response_class=HTMLResponse, include_in_schema=False)
+        async def index_with_overlay():
+            try:
+                with open("frontend/index.html", "r", encoding="utf-8") as f:
+                    html = f.read()
+            except FileNotFoundError:
+                return HTMLResponse("Frontend not built yet.", status_code=404)
+            tag = '<script src="/live-mode-overlay/overlay.js" defer></script>'
+            if tag not in html:
+                if "</body>" in html:
+                    html = html.replace("</body>", f"  {tag}\n  </body>")
+                else:
+                    html += "\n" + tag + "\n"
+            return HTMLResponse(html)
 
         # Initialize and include proxy routes if proxy is enabled
         system_config = config.system_config
@@ -140,6 +166,14 @@ class WebSocketServer:
             CORSStaticFiles(directory="web_tool", html=True),
             name="web_tool",
         )
+
+        # Mount the Gemini Live Mode overlay assets (injected into the main page)
+        if os.path.isdir("live_mode_overlay"):
+            self.app.mount(
+                "/live-mode-overlay",
+                CORSStaticFiles(directory="live_mode_overlay"),
+                name="live_mode_overlay",
+            )
 
         # Mount main frontend last (as catch-all)
         self.app.mount(

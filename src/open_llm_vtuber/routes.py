@@ -1,3 +1,4 @@
+import base64
 import os
 import json
 from uuid import uuid4
@@ -10,6 +11,7 @@ from loguru import logger
 from .service_context import ServiceContext
 from .websocket_handler import WebSocketHandler
 from .proxy_handler import ProxyHandler
+from .agent.agents.gemini_live_agent import GeminiLiveAgent
 
 
 def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
@@ -41,6 +43,123 @@ def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
             logger.error(f"Error in WebSocket connection: {e}")
             await ws_handler.handle_disconnect(client_uid)
             raise
+
+    return router
+
+
+def init_live_mode_route(default_context_cache: ServiceContext) -> APIRouter:
+    """
+    Dedicated `/live-ws` endpoint for Gemini Live Mode.
+
+    Independent of the main `/client-ws` handler — each connection gets its
+    own short-lived GeminiLiveAgent built from `agent_settings.gemini_live_agent`
+    in the active config. This lets the user keep `basic_memory_agent` as the
+    main conversation agent and still open a Live Mode session on demand.
+    """
+    router = APIRouter()
+
+    @router.websocket("/live-ws")
+    async def live_ws_endpoint(websocket: WebSocket):
+        await websocket.accept()
+        client_uid = str(uuid4())[:8]
+        logger.info(f"Live-WS client connected: {client_uid}")
+
+        settings = (
+            default_context_cache.character_config.agent_config.agent_settings.gemini_live_agent
+            if default_context_cache.character_config
+            else None
+        )
+        if settings is None:
+            await websocket.send_json(
+                {
+                    "type": "live-error",
+                    "message": "gemini_live_agent is not configured in conf.yaml",
+                }
+            )
+            await websocket.close()
+            return
+
+        # Use the constructed system prompt if available (skills are baked in there);
+        # fall back to persona_prompt if not yet built.
+        system_prompt = getattr(default_context_cache, "system_prompt", None)
+        if not system_prompt:
+            system_prompt = (
+                default_context_cache.character_config.persona_prompt
+                if default_context_cache.character_config
+                else None
+            )
+
+        agent = GeminiLiveAgent(
+            api_key=settings.api_key,
+            model=settings.model,
+            voice_name=settings.voice_name,
+            language_code=settings.language_code,
+            system_instruction=system_prompt,
+            idle_timeout=settings.idle_timeout,
+        )
+
+        async def on_event(ev: dict) -> None:
+            try:
+                if ev["type"] == "audio":
+                    payload = {
+                        "type": "live-audio",
+                        "data": base64.b64encode(ev["pcm"]).decode("ascii"),
+                        "sample_rate": 24000,
+                    }
+                elif ev["type"] == "input_transcript":
+                    payload = {"type": "live-input-transcript", "text": ev["text"]}
+                elif ev["type"] == "output_transcript":
+                    payload = {"type": "live-output-transcript", "text": ev["text"]}
+                elif ev["type"] == "interrupted":
+                    payload = {"type": "live-interrupted"}
+                elif ev["type"] == "turn_complete":
+                    payload = {"type": "live-turn-complete"}
+                elif ev["type"] == "ready":
+                    payload = {"type": "live-ready"}
+                elif ev["type"] == "error":
+                    payload = {"type": "live-error", "message": ev["message"]}
+                else:
+                    return
+                await websocket.send_json(payload)
+            except Exception as e:
+                logger.warning(f"Live-WS {client_uid}: send failed: {e}")
+
+        try:
+            await agent.start_live_session(on_event)
+
+            while True:
+                msg = await websocket.receive_json()
+                mtype = msg.get("type")
+
+                if mtype == "live-mic-audio":
+                    b64 = msg.get("data")
+                    if b64:
+                        try:
+                            await agent.send_realtime_audio(base64.b64decode(b64))
+                        except Exception as e:
+                            logger.warning(f"Live-WS {client_uid}: audio failed: {e}")
+
+                elif mtype == "live-text-input":
+                    text = msg.get("text", "")
+                    if text:
+                        await agent.send_realtime_text(text)
+
+                elif mtype == "stop":
+                    break
+
+                elif mtype == "ping":
+                    await websocket.send_json({"type": "pong"})
+
+        except WebSocketDisconnect:
+            logger.info(f"Live-WS client disconnected: {client_uid}")
+        except Exception as e:
+            logger.error(f"Live-WS {client_uid} error: {e}")
+        finally:
+            try:
+                await agent.stop_live_session()
+            except Exception as e:
+                logger.warning(f"Live-WS {client_uid}: cleanup error: {e}")
+            logger.info(f"Live-WS {client_uid} closed")
 
     return router
 

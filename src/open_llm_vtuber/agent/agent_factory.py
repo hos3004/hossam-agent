@@ -6,6 +6,7 @@ from .agents.basic_memory_agent import BasicMemoryAgent
 from .stateless_llm_factory import LLMFactory as StatelessLLMFactory
 from .agents.hume_ai import HumeAIAgent
 from .agents.letta_agent import LettaAgent
+from .agents.gemini_live_agent import GeminiLiveAgent
 
 from ..mcpp.tool_manager import ToolManager
 from ..mcpp.tool_executor import ToolExecutor
@@ -126,6 +127,17 @@ class AgentFactory:
                 segment_method=settings.get("segment_method"),
                 host=settings.get("host"),
                 port=settings.get("port"),
+            )
+
+        elif conversation_agent_choice == "gemini_live_agent":
+            settings = agent_settings.get("gemini_live_agent", {})
+            return GeminiLiveAgent(
+                api_key=settings.get("api_key"),
+                model=settings.get("model", "gemini-live-2.5-flash-preview"),
+                voice_name=settings.get("voice_name", "Aoede"),
+                language_code=settings.get("language_code", "ar-XA"),
+                system_instruction=system_prompt,
+                idle_timeout=settings.get("idle_timeout", 30),
             )
 
         else:
