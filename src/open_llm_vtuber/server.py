@@ -9,7 +9,7 @@ It uses FastAPI for the server and Starlette for static file serving.
 import os
 import shutil
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse, Response
 from starlette.staticfiles import StaticFiles as StarletteStaticFiles
@@ -108,19 +108,46 @@ class WebSocketServer:
 
         # Serve a modified index.html that injects the Live Mode overlay
         # before falling through to the static `/` mount.
+        # When `?mode=companion` is present (used by the Electron desktop
+        # shell), also inject the companion overlay CSS + init script so
+        # the same HTML doubles as a minimal frameless avatar window.
         @self.app.get("/", response_class=HTMLResponse, include_in_schema=False)
-        async def index_with_overlay():
+        async def index_with_overlay(request: Request):
             try:
                 with open("frontend/index.html", "r", encoding="utf-8") as f:
                     html = f.read()
             except FileNotFoundError:
                 return HTMLResponse("Frontend not built yet.", status_code=404)
-            tag = '<script src="/live-mode-overlay/overlay.js" defer></script>'
-            if tag not in html:
+
+            mode = request.query_params.get("mode")
+            head_tags: list[str] = []
+            body_tags: list[str] = [
+                '<script src="/live-mode-overlay/overlay.js" defer></script>'
+            ]
+            if mode == "companion":
+                head_tags.append(
+                    '<link rel="stylesheet" href="/live-mode-overlay/companion.css">'
+                )
+                body_tags.append(
+                    '<script src="/live-mode-overlay/companion-init.js" defer></script>'
+                )
+
+            for tag in head_tags:
+                if tag in html:
+                    continue
+                if "</head>" in html:
+                    html = html.replace("</head>", f"  {tag}\n  </head>", 1)
+                else:
+                    html = tag + "\n" + html
+
+            for tag in body_tags:
+                if tag in html:
+                    continue
                 if "</body>" in html:
-                    html = html.replace("</body>", f"  {tag}\n  </body>")
+                    html = html.replace("</body>", f"  {tag}\n  </body>", 1)
                 else:
                     html += "\n" + tag + "\n"
+
             return HTMLResponse(html)
 
         # Initialize and include proxy routes if proxy is enabled

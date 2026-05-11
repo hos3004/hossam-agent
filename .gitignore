@@ -81,6 +81,11 @@ labs/*/.vite/
 labs/*/.vite-temp/
 labs/*/dist-types/
 
+# Electron desktop shell (committed source only)
+desktop/node_modules/
+desktop/dist/
+desktop/out/
+
 *.exe
 
 tmp/

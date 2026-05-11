@@ -1,0 +1,113 @@
+/*
+ * Companion-mode stylesheet
+ * --------------------------
+ * Injected only when the page is requested with `?mode=companion` (used by
+ * the Electron desktop shell). Turns the standard Open-LLM-VTuber web UI
+ * into a minimal, transparent, draggable avatar window suitable for a
+ * desktop pet / overlay companion.
+ *
+ * Strategy:
+ *   - Make the page background fully transparent.
+ *   - Add a 28 px draggable strip at the very top (Electron region).
+ *   - Hide the main React app's chrome elements via best-effort attribute
+ *     selectors (sidebar / settings / toolbar / message list / etc.).
+ *   - Stretch the Live2D <canvas> to fill the remaining area.
+ *
+ * The selectors are intentionally generic. If the upstream frontend changes
+ * its class names, the regression is purely cosmetic (some chrome may peek
+ * through) — functionality (mic, Live Mode, transcripts) is unaffected.
+ */
+
+html, body, #root {
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  color-scheme: dark light;
+}
+
+/* ---- Drag handle: 28 px transparent strip at the top of the window ----- */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 9999;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* Interactive elements must not steal the drag region. */
+button, a, input, select, textarea, [role="button"], [tabindex],
+canvas, .gl-overlay-root, .gl-overlay-root * {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* ---- Hide common chrome (best-effort attribute selectors) ------------- */
+nav, header, footer, aside {
+  display: none !important;
+}
+
+[class*="sidebar" i],
+[class*="Sidebar"],
+[class*="settings-panel" i],
+[class*="SettingsPanel"],
+[class*="toolbar" i],
+[class*="Toolbar"],
+[class*="header-bar" i],
+[class*="footer-bar" i],
+[class*="message-list" i],
+[class*="MessageList"],
+[class*="chat-history" i],
+[class*="chat-input" i],
+[class*="ChatInput"],
+[class*="control-panel" i],
+[class*="ControlPanel"],
+[class*="config-panel" i] {
+  display: none !important;
+}
+
+/* ---- Stretch the Live2D canvas to fill the window --------------------- */
+canvas {
+  position: fixed !important;
+  top: 28px !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: calc(100vh - 28px) !important;
+  background: transparent !important;
+}
+
+/* Keep our Live Mode overlay button visible above everything. */
+.gl-overlay-root {
+  z-index: 100000 !important;
+}
+
+/* Companion-mode "close" pill (added by companion-init.js). */
+.gl-companion-close {
+  position: fixed;
+  top: 4px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(244, 63, 94, 0.18);
+  color: #fda4af;
+  font-size: 14px;
+  line-height: 1;
+  font-family: -apple-system, "Segoe UI", sans-serif;
+  cursor: pointer;
+  z-index: 100001;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+.gl-companion-close:hover {
+  background: rgba(244, 63, 94, 0.4);
+  transform: scale(1.08);
+}
