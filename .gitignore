@@ -68,6 +68,18 @@ openapi_memgpt.json
 # memory log
 mem.json
 conf.yaml.backup
+conf.yaml.before-gemini-stack
+conf.yaml.before-arabic-tts
+
+# Claude worktrees + agent metadata
+.claude/
+
+# Lab dependencies (committed source only)
+labs/*/node_modules/
+labs/*/dist/
+labs/*/.vite/
+labs/*/.vite-temp/
+labs/*/dist-types/
 
 *.exe
 
