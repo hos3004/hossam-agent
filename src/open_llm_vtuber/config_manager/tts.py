@@ -411,6 +411,36 @@ class SparkTTSConfig(I18nMixin):
     }
 
 
+class GeminiTTSConfig(I18nMixin):
+    """Configuration for Gemini TTS."""
+
+    api_key: str = Field(..., alias="api_key")
+    model: str = Field("gemini-2.5-flash-preview-tts", alias="model")
+    voice_name: str = Field("Kore", alias="voice_name")
+    language_code: str = Field("ar-XA", alias="language_code")
+    style_prompt: Optional[str] = Field(None, alias="style_prompt")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "api_key": Description(en="Google AI Studio API key", zh="Google AI Studio API 密钥"),
+        "model": Description(
+            en="Gemini TTS model (e.g., gemini-2.5-flash-preview-tts)",
+            zh="Gemini TTS 模型名称",
+        ),
+        "voice_name": Description(
+            en="Prebuilt voice name (Aoede, Kore, Puck, Charon, ...)",
+            zh="预置语音名称",
+        ),
+        "language_code": Description(
+            en="BCP-47 language code, e.g. ar-XA for Arabic, en-US for English",
+            zh="语言代码（如 ar-XA、en-US）",
+        ),
+        "style_prompt": Description(
+            en="Optional natural-language style/tone prompt prepended to text",
+            zh="可选的风格提示，会前置到合成文本前",
+        ),
+    }
+
+
 class MinimaxTTSConfig(I18nMixin):
     """Configuration for Minimax TTS."""
 
@@ -450,6 +480,7 @@ class TTSConfig(I18nMixin):
         "openai_tts",  # Add openai_tts here
         "spark_tts",
         "minimax_tts",
+        "gemini_tts",
     ] = Field(..., alias="tts_model")
 
     azure_tts: Optional[AzureTTSConfig] = Field(None, alias="azure_tts")
@@ -471,6 +502,7 @@ class TTSConfig(I18nMixin):
     openai_tts: Optional[OpenAITTSConfig] = Field(None, alias="openai_tts")
     spark_tts: Optional[SparkTTSConfig] = Field(None, alias="spark_tts")
     minimax_tts: Optional[MinimaxTTSConfig] = Field(None, alias="minimax_tts")
+    gemini_tts: Optional[GeminiTTSConfig] = Field(None, alias="gemini_tts")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "tts_model": Description(
@@ -506,6 +538,9 @@ class TTSConfig(I18nMixin):
         "spark_tts": Description(en="Configuration for Spark TTS", zh="Spark TTS 配置"),
         "minimax_tts": Description(
             en="Configuration for Minimax TTS", zh="Minimax TTS 配置"
+        ),
+        "gemini_tts": Description(
+            en="Configuration for Gemini TTS", zh="Gemini TTS 配置"
         ),
     }
 
@@ -544,5 +579,7 @@ class TTSConfig(I18nMixin):
             values.spark_tts.model_validate(values.spark_tts.model_dump())
         elif tts_model == "minimax_tts" and values.minimax_tts is not None:
             values.minimax_tts.model_validate(values.minimax_tts.model_dump())
+        elif tts_model == "gemini_tts" and values.gemini_tts is not None:
+            values.gemini_tts.model_validate(values.gemini_tts.model_dump())
 
         return values

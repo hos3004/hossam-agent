@@ -50,6 +50,31 @@ class TencentConfig(I18nMixin):
     }
 
 
+class GeminiTranslateConfig(I18nMixin):
+    """Configuration for Gemini-backed translation."""
+
+    api_key: str = Field(..., alias="api_key")
+    target_lang: str = Field(..., alias="target_lang")
+    source_lang: Optional[str] = Field(None, alias="source_lang")
+    model: str = Field("gemini-2.5-flash-lite", alias="model")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "api_key": Description(en="Google AI Studio API key", zh="Google AI Studio API 密钥"),
+        "target_lang": Description(
+            en="Target language (free-form, e.g. 'Arabic', 'Japanese')",
+            zh="目标语言（自由文本，如 'Arabic', 'Japanese'）",
+        ),
+        "source_lang": Description(
+            en="Optional source language hint; leave empty for auto-detect",
+            zh="可选源语言提示；留空则自动检测",
+        ),
+        "model": Description(
+            en="Gemini model used for translation",
+            zh="用于翻译的 Gemini 模型",
+        ),
+    }
+
+
 # --- Main TranslatorConfig model ---
 
 
@@ -57,16 +82,17 @@ class TranslatorConfig(I18nMixin):
     """Configuration for translation services."""
 
     translate_audio: bool = Field(..., alias="translate_audio")
-    translate_provider: Literal["deeplx", "tencent"] = Field(
+    translate_provider: Literal["deeplx", "tencent", "gemini"] = Field(
         ..., alias="translate_provider"
     )
     deeplx: Optional[DeepLXConfig] = Field(None, alias="deeplx")
     tencent: Optional[TencentConfig] = Field(None, alias="tencent")
+    gemini: Optional[GeminiTranslateConfig] = Field(None, alias="gemini")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "translate_audio": Description(
-            en="Enable audio translation (requires DeepLX deployment)",
-            zh="启用音频翻译（需要部署 DeepLX）",
+            en="Enable audio translation (requires a translation backend)",
+            zh="启用音频翻译（需要翻译后端）",
         ),
         "translate_provider": Description(
             en="Translation service provider to use", zh="要使用的翻译服务提供者"
@@ -76,6 +102,9 @@ class TranslatorConfig(I18nMixin):
         ),
         "tencent": Description(
             en="Configuration for TenCent translation service", zh="腾讯 翻译服务配置"
+        ),
+        "gemini": Description(
+            en="Configuration for Gemini translation", zh="Gemini 翻译配置"
         ),
     }
 
@@ -92,6 +121,10 @@ class TranslatorConfig(I18nMixin):
             elif translate_provider == "tencent" and values.tencent is None:
                 raise ValueError(
                     "Tencent configuration must be provided when translate_audio is True and translate_provider is 'tencent'"
+                )
+            elif translate_provider == "gemini" and values.gemini is None:
+                raise ValueError(
+                    "Gemini configuration must be provided when translate_audio is True and translate_provider is 'gemini'"
                 )
 
         return values

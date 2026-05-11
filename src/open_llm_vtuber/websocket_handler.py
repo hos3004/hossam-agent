@@ -1,12 +1,14 @@
 from typing import Dict, List, Optional, Callable, TypedDict
 from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
+import base64
 import json
 from enum import Enum
 import numpy as np
 from loguru import logger
 
 from .service_context import ServiceContext
+from .agent.agents.gemini_live_agent import GeminiLiveAgent
 from .chat_group import (
     ChatGroupManager,
     handle_group_operation,
@@ -43,6 +45,7 @@ class MessageType(Enum):
     CONFIG = ["fetch-configs", "switch-config"]
     CONTROL = ["interrupt-signal", "audio-play-start"]
     DATA = ["mic-audio-data"]
+    LIVE = ["toggle-live-mode", "live-mic-audio", "live-text-input"]
 
 
 class WSMessage(TypedDict, total=False):
@@ -70,6 +73,10 @@ class WebSocketHandler:
         self.default_context_cache = default_context_cache
         self.received_data_buffers: Dict[str, np.ndarray] = {}
 
+        # Live Mode bookkeeping: when a client toggles Live Mode on, mic chunks
+        # bypass ASR and go straight to GeminiLiveAgent.send_realtime_audio().
+        self._live_mode_active: Dict[str, bool] = {}
+
         # Message handlers mapping
         self._message_handlers = self._init_message_handlers()
 
@@ -95,6 +102,10 @@ class WebSocketHandler:
             "audio-play-start": self._handle_audio_play_start,
             "request-init-config": self._handle_init_config_request,
             "heartbeat": self._handle_heartbeat,
+            # Live Mode (Gemini bidirectional voice)
+            "toggle-live-mode": self._handle_toggle_live_mode,
+            "live-mic-audio": self._handle_live_mic_audio,
+            "live-text-input": self._handle_live_text_input,
         }
 
     async def handle_new_connection(
@@ -296,6 +307,16 @@ class WebSocketHandler:
             client_connections=self.client_connections,
             send_group_update=self.send_group_update,
         )
+
+        # Stop any active Gemini Live session for this client
+        if self._live_mode_active.pop(client_uid, False):
+            context = self.client_contexts.get(client_uid)
+            agent = context.agent_engine if context else None
+            if isinstance(agent, GeminiLiveAgent):
+                try:
+                    await agent.stop_live_session()
+                except Exception as e:
+                    logger.warning(f"Error stopping live session on disconnect: {e}")
 
         # Clean up other client data
         self.client_connections.pop(client_uid, None)
@@ -610,3 +631,123 @@ class WebSocketHandler:
             await websocket.send_json({"type": "heartbeat-ack"})
         except Exception as e:
             logger.error(f"Error sending heartbeat acknowledgment: {e}")
+
+    # ------------------------------------------------------------------
+    # Live Mode (Gemini bidirectional voice)
+    # ------------------------------------------------------------------
+    def _get_live_agent(self, client_uid: str) -> Optional[GeminiLiveAgent]:
+        """Return the client's GeminiLiveAgent if its current agent is one, else None."""
+        context = self.client_contexts.get(client_uid)
+        if not context or not context.agent_engine:
+            return None
+        agent = context.agent_engine
+        return agent if isinstance(agent, GeminiLiveAgent) else None
+
+    def _make_live_event_callback(self, websocket: WebSocket, client_uid: str):
+        """Build an async callback that forwards Gemini Live events to the client.
+
+        Audio events are base64-encoded so the JSON transport stays text-only.
+        The frontend decodes and plays them as PCM 24kHz mono int16.
+        """
+
+        async def _on_event(ev: dict) -> None:
+            try:
+                if ev["type"] == "audio":
+                    payload = {
+                        "type": "live-audio",
+                        "data": base64.b64encode(ev["pcm"]).decode("ascii"),
+                        "sample_rate": 24000,
+                    }
+                elif ev["type"] == "input_transcript":
+                    payload = {"type": "live-input-transcript", "text": ev["text"]}
+                elif ev["type"] == "output_transcript":
+                    payload = {"type": "live-output-transcript", "text": ev["text"]}
+                elif ev["type"] == "interrupted":
+                    payload = {"type": "live-interrupted"}
+                elif ev["type"] == "turn_complete":
+                    payload = {"type": "live-turn-complete"}
+                elif ev["type"] == "ready":
+                    payload = {"type": "live-ready"}
+                elif ev["type"] == "error":
+                    payload = {"type": "live-error", "message": ev["message"]}
+                else:
+                    return
+                await websocket.send_text(json.dumps(payload))
+            except Exception as e:
+                logger.error(f"Failed to forward live event for {client_uid}: {e}")
+
+        return _on_event
+
+    async def _handle_toggle_live_mode(
+        self, websocket: WebSocket, client_uid: str, data: WSMessage
+    ) -> None:
+        """Enable/disable Gemini Live Mode for this client."""
+        enable = bool(data.get("enable", False))
+        agent = self._get_live_agent(client_uid)
+
+        if enable and agent is None:
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "live-error",
+                        "message": (
+                            "Current agent is not GeminiLiveAgent. "
+                            "Set conversation_agent_choice: 'gemini_live_agent' in conf.yaml."
+                        ),
+                    }
+                )
+            )
+            return
+
+        if enable:
+            if self._live_mode_active.get(client_uid):
+                return  # already on
+            await agent.start_live_session(
+                self._make_live_event_callback(websocket, client_uid)
+            )
+            self._live_mode_active[client_uid] = True
+            logger.info(f"Live Mode ON for client {client_uid}")
+        else:
+            if not self._live_mode_active.get(client_uid):
+                return  # already off
+            self._live_mode_active[client_uid] = False
+            if agent is not None:
+                await agent.stop_live_session()
+            await websocket.send_text(json.dumps({"type": "live-stopped"}))
+            logger.info(f"Live Mode OFF for client {client_uid}")
+
+    async def _handle_live_mic_audio(
+        self, websocket: WebSocket, client_uid: str, data: WSMessage
+    ) -> None:
+        """Forward a microphone chunk straight to Gemini Live.
+
+        The frontend sends base64-encoded PCM 16kHz mono 16-bit little-endian.
+        """
+        if not self._live_mode_active.get(client_uid):
+            return
+        agent = self._get_live_agent(client_uid)
+        if agent is None:
+            return
+        b64 = data.get("data")
+        if not b64:
+            return
+        try:
+            pcm_bytes = base64.b64decode(b64)
+        except Exception as e:
+            logger.warning(f"Bad base64 audio from {client_uid}: {e}")
+            return
+        await agent.send_realtime_audio(pcm_bytes)
+
+    async def _handle_live_text_input(
+        self, websocket: WebSocket, client_uid: str, data: WSMessage
+    ) -> None:
+        """Send a text turn into an active live session (interrupts the model)."""
+        if not self._live_mode_active.get(client_uid):
+            return
+        agent = self._get_live_agent(client_uid)
+        if agent is None:
+            return
+        text = data.get("text", "")
+        if not text:
+            return
+        await agent.send_realtime_text(text)

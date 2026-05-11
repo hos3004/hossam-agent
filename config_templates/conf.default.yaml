@@ -47,6 +47,10 @@ character_config:
   #  =================== LLM Backend Settings ===================
 
   agent_config:
+    # Default conversation agent.
+    # - 'basic_memory_agent'   → normal text-streamed flow (LLM → TTS separately).
+    # - 'gemini_live_agent'    → real-time bidirectional voice (Live Mode).
+    #   The frontend toggles between them via a "Live Mode" button.
     conversation_agent_choice: 'basic_memory_agent'
 
     agent_settings:
@@ -54,11 +58,12 @@ character_config:
         # The Basic AI Agent. Nothing fancy.
         # choose one of the llm provider from the llm_config
         # and set the required parameters in the corresponding field
-        # examples: 
-        # 'openai_compatible_llm', 'llama_cpp_llm', 'claude_llm', 'ollama_llm'
-        # 'openai_llm', 'gemini_llm', 'zhipu_llm', 'deepseek_llm', 'groq_llm'
-        # 'mistral_llm', 'lmstudio_llm', and more
-        llm_provider: 'ollama_llm'
+        # examples:
+        # 'gemini_native_llm' (recommended), 'openai_compatible_llm',
+        # 'llama_cpp_llm', 'claude_llm', 'ollama_llm', 'openai_llm',
+        # 'gemini_llm', 'zhipu_llm', 'deepseek_llm', 'groq_llm',
+        # 'mistral_llm', 'lmstudio_llm'
+        llm_provider: 'gemini_native_llm'
         # let ai speak as soon as the first comma is received on the first sentence
         # to reduced latency.
         faster_first_response: True
@@ -68,6 +73,17 @@ character_config:
         # 'Plus' means that it has the ability to call tools by using OpenAI API.
         use_mcpp: True
         mcp_enabled_servers: ["time", "ddg-search"] # Enabled MCP servers
+
+      # Real-time bidirectional voice via Gemini Live API.
+      # Activated by the "Live Mode" toggle in the frontend.
+      # When active, mic audio is streamed directly to Gemini and the
+      # response audio is played back without going through TTS.
+      gemini_live_agent:
+        api_key: 'YOUR_GEMINI_API_KEY'
+        model: 'gemini-live-2.5-flash-preview'
+        voice_name: 'Aoede'        # Aoede, Kore, Puck, Charon, Fenrir, Leda, Orus, Zephyr
+        language_code: 'ar-XA'     # ar-XA for Arabic, en-US for English
+        idle_timeout: 30
 
       letta_agent:
         host: 'localhost' # Host address
@@ -145,6 +161,14 @@ character_config:
         model: 'gpt-4o'
         temperature: 1.0 # value between 0 to 2
 
+      # Native Gemini via google-genai SDK (recommended).
+      # Supports streaming, function calling, multimodal, etc.
+      gemini_native_llm:
+        llm_api_key: 'YOUR_GEMINI_API_KEY'
+        model: 'gemini-2.5-flash'   # or 'gemini-2.5-pro'
+        temperature: 1.0
+
+      # Legacy Gemini through the OpenAI-compatible endpoint (kept as fallback).
       gemini_llm:
         llm_api_key: 'Your Gemini API Key'
         model: 'gemini-2.0-flash-exp'
@@ -172,8 +196,18 @@ character_config:
 
   # === Automatic Speech Recognition ===
   asr_config:
-    # speech to text model options: 'faster_whisper', 'whisper_cpp', 'whisper', 'azure_asr', 'fun_asr', 'groq_whisper_asr', 'sherpa_onnx_asr'
-    asr_model: 'sherpa_onnx_asr'
+    # speech to text model options:
+    #   'gemini_asr' (recommended for Arabic via Gemini multimodal),
+    #   'sherpa_onnx_asr' (recommended local/offline),
+    #   'faster_whisper', 'whisper_cpp', 'whisper', 'azure_asr', 'fun_asr',
+    #   'groq_whisper_asr'
+    # Note: Live Mode bypasses ASR entirely (transcription comes from Gemini Live itself).
+    asr_model: 'gemini_asr'
+
+    gemini_asr:
+      api_key: 'YOUR_GEMINI_API_KEY'
+      model: 'gemini-2.5-flash'
+      language: 'Arabic'   # human-readable hint; leave empty for auto-detect
 
     azure_asr:
       api_key: 'azure_api_key'
@@ -269,12 +303,20 @@ character_config:
 
   # =================== Text to Speech ===================
   tts_config:
-    tts_model: 'edge_tts'
+    tts_model: 'gemini_tts'
     # text to speech model options:
-    #   'azure_tts', 'pyttsx3_tts', 'edge_tts', 'bark_tts',
-    #   'cosyvoice_tts', 'melo_tts', 'coqui_tts',
-    #   'fish_api_tts', 'x_tts', 'gpt_sovits_tts', 'sherpa_onnx_tts'
-    #   'minimax_tts'
+    #   'gemini_tts' (recommended for Arabic), 'azure_tts', 'pyttsx3_tts',
+    #   'edge_tts', 'bark_tts', 'cosyvoice_tts', 'melo_tts', 'coqui_tts',
+    #   'fish_api_tts', 'x_tts', 'gpt_sovits_tts', 'sherpa_onnx_tts',
+    #   'minimax_tts', 'openai_tts', 'spark_tts'
+
+    gemini_tts:
+      api_key: 'YOUR_GEMINI_API_KEY'
+      model: 'gemini-2.5-flash-preview-tts'
+      voice_name: 'Kore'           # Aoede, Kore, Puck, Charon, Fenrir, Leda, Orus, Zephyr
+      language_code: 'ar-XA'       # ar-XA for Arabic, en-US for English
+      # Optional natural-language style prompt prepended before each line of text
+      # style_prompt: "تحدثي بنبرة دافئة وبطيئة قليلًا"
 
     azure_tts:
       api_key: 'azure-api-key'
@@ -444,8 +486,14 @@ character_config:
 
     translator_config:
       # Like... you speak and read the subtitles in English, and the TTS speaks Japanese or that kind of things
-      translate_audio: False # Warning: you need to deploy DeeplX to use this. Otherwise it's going to crash
-      translate_provider: 'deeplx' # deeplx or tencent
+      translate_audio: False
+      translate_provider: 'gemini' # 'gemini' (recommended), 'deeplx', or 'tencent'
+
+      gemini:
+        api_key: 'YOUR_GEMINI_API_KEY'
+        target_lang: 'Arabic'
+        # source_lang: 'English'      # optional; leave commented for auto-detect
+        model: 'gemini-2.5-flash-lite'
 
       deeplx:
         deeplx_target_lang: 'JA'

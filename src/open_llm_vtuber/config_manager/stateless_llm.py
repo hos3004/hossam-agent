@@ -143,7 +143,7 @@ class OpenAIConfig(OpenAICompatibleConfig):
 
 
 class GeminiConfig(OpenAICompatibleConfig):
-    """Configuration for Gemini API."""
+    """Configuration for Gemini via the OpenAI-compatible endpoint (legacy)."""
 
     base_url: str = Field(
         "https://generativelanguage.googleapis.com/v1beta/openai/", alias="base_url"
@@ -151,6 +151,35 @@ class GeminiConfig(OpenAICompatibleConfig):
     interrupt_method: Literal["system", "user"] = Field(
         "user", alias="interrupt_method"
     )
+
+
+class GeminiNativeConfig(StatelessLLMBaseConfig):
+    """Configuration for native Gemini via google-genai SDK."""
+
+    llm_api_key: str = Field(..., alias="llm_api_key")
+    model: str = Field("gemini-2.5-flash", alias="model")
+    temperature: float = Field(1.0, alias="temperature")
+    interrupt_method: Literal["system", "user"] = Field(
+        "user", alias="interrupt_method"
+    )
+
+    _GEMINI_NATIVE_DESCRIPTIONS: ClassVar[dict[str, Description]] = {
+        "llm_api_key": Description(
+            en="Google AI Studio API key", zh="Google AI Studio API 密钥"
+        ),
+        "model": Description(
+            en="Gemini model name (e.g., gemini-2.5-flash, gemini-2.5-pro)",
+            zh="Gemini 模型名称",
+        ),
+        "temperature": Description(
+            en="Sampling temperature (0–2)", zh="采样温度（0–2）"
+        ),
+    }
+
+    DESCRIPTIONS: ClassVar[dict[str, Description]] = {
+        **StatelessLLMBaseConfig.DESCRIPTIONS,
+        **_GEMINI_NATIVE_DESCRIPTIONS,
+    }
 
 
 class MistralConfig(OpenAICompatibleConfig):
@@ -243,6 +272,9 @@ class StatelessLLMConfigs(I18nMixin, BaseModel):
     lmstudio_llm: LmStudioConfig | None = Field(None, alias="lmstudio_llm")
     openai_llm: OpenAIConfig | None = Field(None, alias="openai_llm")
     gemini_llm: GeminiConfig | None = Field(None, alias="gemini_llm")
+    gemini_native_llm: GeminiNativeConfig | None = Field(
+        None, alias="gemini_native_llm"
+    )
     zhipu_llm: ZhipuConfig | None = Field(None, alias="zhipu_llm")
     deepseek_llm: DeepseekConfig | None = Field(None, alias="deepseek_llm")
     groq_llm: GroqConfig | None = Field(None, alias="groq_llm")
@@ -266,7 +298,12 @@ class StatelessLLMConfigs(I18nMixin, BaseModel):
             en="Configuration for Official OpenAI API", zh="官方 OpenAI API 配置"
         ),
         "gemini_llm": Description(
-            en="Configuration for Gemini API", zh="Gemini API 配置"
+            en="Configuration for Gemini API (OpenAI-compatible endpoint)",
+            zh="Gemini API 配置（OpenAI 兼容端点）",
+        ),
+        "gemini_native_llm": Description(
+            en="Configuration for native Gemini via google-genai SDK",
+            zh="原生 Gemini SDK 配置",
         ),
         "mistral_llm": Description(
             en="Configuration for Mistral API", zh="Mistral API 配置"

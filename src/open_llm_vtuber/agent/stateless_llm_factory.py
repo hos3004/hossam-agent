@@ -9,6 +9,7 @@ from .stateless_llm.stateless_llm_with_template import (
 from .stateless_llm.openai_compatible_llm import AsyncLLM as OpenAICompatibleLLM
 from .stateless_llm.ollama_llm import OllamaLLM
 from .stateless_llm.claude_llm import AsyncLLM as ClaudeLLM
+from .stateless_llm.gemini_native_llm import AsyncLLM as GeminiNativeLLM
 
 
 class LLMFactory:
@@ -73,6 +74,12 @@ class LLMFactory:
                 base_url=kwargs.get("base_url"),
                 model=kwargs.get("model"),
                 llm_api_key=kwargs.get("llm_api_key"),
+            )
+        elif llm_provider == "gemini_native_llm":
+            return GeminiNativeLLM(
+                model=kwargs.get("model"),
+                llm_api_key=kwargs.get("llm_api_key"),
+                temperature=kwargs.get("temperature", 1.0),
             )
         else:
             raise ValueError(f"Unsupported LLM provider: {llm_provider}")
