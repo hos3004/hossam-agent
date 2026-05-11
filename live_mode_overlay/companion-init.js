@@ -1,16 +1,21 @@
 /*
  * Companion-mode bootstrap
  * ------------------------
- * Runs only when the page was loaded with `?mode=companion`. Two jobs:
+ * Runs only when the page was loaded with `?mode=companion`. Three jobs:
  *
- *   1. Inject a small "×" close pill (Electron window has no native frame).
+ *   1. Inject a "×" close pill (Electron window has no native frame).
  *
- *   2. Periodically strip inline-style background-image / background-color
- *      from every element except the canvas, our overlay button, our
- *      close pill, and elements that look like a speech bubble. The
- *      stylesheet (companion.css) already does this via `!important`, but
- *      React may write inline styles that win in some cases. This is a
- *      defensive fallback.
+ *   2. Find the Live2D <canvas> inside #root, walk back up to its
+ *      top-level child of #root, mark it with .gl-companion-keep, and
+ *      mark every other top-level child of #root with .gl-companion-hidden.
+ *      That single structural rule eliminates the sidebar, the background
+ *      image wrapper, the connected pill, the speech bubble, and the
+ *      bottom controls in one move — without depending on any specific
+ *      Chakra UI class name.
+ *
+ *   3. Keep watching the DOM with a MutationObserver: when React
+ *      re-renders and the canvas moves under a new sibling, we re-tag
+ *      siblings so chrome stays hidden.
  */
 (function () {
   "use strict";
@@ -28,61 +33,57 @@
     document.body.appendChild(btn);
   }
 
-  // ---- Background scrubber -----------------------------------------------
-  // Allow-list: elements that may keep their inline background.
-  const KEEP_BG_SELECTORS = [
-    "canvas",
-    ".gl-overlay-root",
-    ".gl-overlay-root *",
-    ".gl-companion-close",
-  ];
-  const KEEP_BG_CLASS_HINTS = ["bubble", "speech", "subtitle", "caption"];
-
-  function isKeepBg(el) {
-    if (KEEP_BG_SELECTORS.some((sel) => el.matches(sel))) return true;
-    const cls = (el.className || "") + "";
-    return KEEP_BG_CLASS_HINTS.some((h) => cls.toLowerCase().includes(h));
+  // ---- Find the top-level child of #root that contains the canvas ------
+  function topLevelAncestor(el, root) {
+    let cur = el;
+    while (cur && cur.parentElement !== root) cur = cur.parentElement;
+    return cur;
   }
 
-  function stripInlineBackgrounds(root) {
-    const all = root.querySelectorAll("*");
-    for (const el of all) {
-      if (!el.style) continue;
-      if (isKeepBg(el)) continue;
-      // Only touch elements that actually have an inline background set,
-      // so we don't fight every React re-render unnecessarily.
-      const s = el.style;
-      if (
-        s.backgroundImage ||
-        s.background ||
-        (s.backgroundColor && s.backgroundColor !== "transparent")
-      ) {
-        s.setProperty("background", "transparent", "important");
-        s.setProperty("background-image", "none", "important");
+  function refreshLayout() {
+    const root = document.getElementById("root");
+    if (!root) return;
+    const canvas = root.querySelector("canvas");
+    if (!canvas) return;
+
+    const keeper = topLevelAncestor(canvas, root);
+    if (!keeper) return;
+
+    for (const child of root.children) {
+      if (child === keeper) {
+        if (!child.classList.contains("gl-companion-keep")) {
+          child.classList.add("gl-companion-keep");
+        }
+        child.classList.remove("gl-companion-hidden");
+      } else {
+        // Don't hide our own overlay elements if they ever land here.
+        if (child.classList.contains("gl-overlay-root")) continue;
+        if (child.classList.contains("gl-companion-close")) continue;
+        if (!child.classList.contains("gl-companion-hidden")) {
+          child.classList.add("gl-companion-hidden");
+        }
       }
     }
   }
 
   function start() {
     injectCloseButton();
-    stripInlineBackgrounds(document);
+    refreshLayout();
 
-    // React keeps re-rendering — keep scrubbing on each DOM mutation,
-    // but rate-limited so we don't burn CPU.
+    // React keeps re-rendering — keep re-applying our structural rule,
+    // throttled with requestAnimationFrame to avoid burning CPU.
     let scheduled = false;
     const observer = new MutationObserver(() => {
       if (scheduled) return;
       scheduled = true;
       requestAnimationFrame(() => {
         scheduled = false;
-        stripInlineBackgrounds(document);
+        refreshLayout();
       });
     });
     observer.observe(document.body, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ["style", "class"],
     });
   }
 
