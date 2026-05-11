@@ -17,7 +17,7 @@
 
 "use strict";
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
@@ -32,6 +32,10 @@ const COMPANION_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/?mode=companion`;
 const FULL_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/`;
 const BACKEND_READY_PATH = "/openapi.json";
 const BACKEND_BOOT_TIMEOUT_MS = 90_000;
+
+// Window sizes for the two companion modes.
+const COMPANION_NARROW = { width: 420, height: 640 };
+const COMPANION_WIDE = { width: 900, height: 720 };
 
 // ---------------------------------------------------------------------------
 // State
@@ -126,8 +130,8 @@ async function restartBackend() {
 // ---------------------------------------------------------------------------
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 640,
+    width: COMPANION_NARROW.width,
+    height: COMPANION_NARROW.height,
     minWidth: 280,
     minHeight: 360,
     frame: false,
@@ -139,6 +143,7 @@ function createWindow() {
     show: false,
     icon: path.join(__dirname, "app-icon.png"),
     webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -222,6 +227,16 @@ function createTray() {
     mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
   });
 }
+
+// ---------------------------------------------------------------------------
+// IPC — chat-toggle resize
+// ---------------------------------------------------------------------------
+ipcMain.on("window:toggle-chat", (_event, open) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const target = open ? COMPANION_WIDE : COMPANION_NARROW;
+  mainWindow.setMinimumSize(280, 360);
+  mainWindow.setSize(target.width, target.height, true);
+});
 
 // ---------------------------------------------------------------------------
 // App lifecycle

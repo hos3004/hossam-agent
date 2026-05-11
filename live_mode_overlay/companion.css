@@ -2,17 +2,19 @@
  * Companion-mode stylesheet
  * --------------------------
  * Injected only when the page is requested with `?mode=companion` (used by
- * the Electron desktop shell). Turns the standard Open-LLM-VTuber web UI
- * into a minimal, transparent, draggable avatar window suitable for a
- * desktop pet / overlay companion.
+ * the Electron desktop shell).
  *
- * Strategy:
- *   1. Make the page transparent (html / body / #root).
- *   2. Hide the background <img> tag that the frontend uses for scenery.
- *   3. Hide all chrome — companion-init.js does the structural work
- *      (keeps only the canvas wrapper under #root and our overlays).
- *   4. Add a 28 px draggable strip at the very top (Electron region).
- *   5. Force the Live2D <canvas> to fill the window.
+ * Two visual states:
+ *   - Default (body NOT having .gl-chat-open):
+ *       Only the Live2D <canvas> is visible, plus our floating buttons.
+ *       Page is fully transparent so Electron's transparent window shows
+ *       the desktop behind the avatar.
+ *
+ *   - Chat open (body has .gl-chat-open):
+ *       The previously-hidden chrome wrapper (chat history sidebar +
+ *       message list + input bar) reappears as a semi-transparent panel
+ *       covering the full window. RTL direction so Arabic feels natural.
+ *       Electron simultaneously grows the window (~900x720) via IPC.
  */
 
 html, body, #root {
@@ -55,6 +57,12 @@ img {
 .gl-companion-close:hover {
   background-color: rgba(244, 63, 94, 0.85) !important;
 }
+.gl-chat-toggle {
+  background-color: rgba(99, 102, 241, 0.65) !important;
+}
+.gl-chat-toggle:hover {
+  background-color: rgba(99, 102, 241, 0.95) !important;
+}
 
 /* ---- Drag handle: 28 px transparent strip at the top of the window -- */
 body::before {
@@ -92,13 +100,13 @@ canvas {
   z-index: 100000 !important;
 }
 
-/* ---- Companion-mode "close" pill (added by companion-init.js) ------- */
-.gl-companion-close {
+/* ---- Floating pill buttons (close + chat toggle) -------------------- */
+.gl-companion-close,
+.gl-chat-toggle {
   position: fixed;
   top: 4px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 0;
   color: #ffffff;
@@ -109,19 +117,17 @@ canvas {
   z-index: 100001;
   -webkit-app-region: no-drag;
   app-region: no-drag;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.2s ease, transform 0.1s ease;
 }
-.gl-companion-close:hover {
-  transform: scale(1.08);
-}
+.gl-companion-close { right: 8px; }
+.gl-chat-toggle { right: 38px; }
+.gl-companion-close:hover,
+.gl-chat-toggle:hover { transform: scale(1.08); }
 
-/* ---- Companion-mode helpers added by companion-init.js -------------- */
-.gl-companion-hidden {
-  display: none !important;
-  visibility: hidden !important;
-}
-
-/* The canvas wrapper that we keep is tagged with this class by JS. */
+/* ---- The chrome wrapper that we keep is tagged with this class by JS -- */
 .gl-companion-keep {
   position: fixed !important;
   inset: 28px 0 0 0 !important;
@@ -131,4 +137,103 @@ canvas {
   padding: 0 !important;
   overflow: hidden !important;
   background: transparent !important;
+}
+
+/* ---- Default: hide chrome (sidebar + chat history + input bar) ------ */
+.gl-companion-chrome {
+  display: none !important;
+}
+
+/* =====================================================================
+ * Chat-open state
+ * =====================================================================
+ * When body has .gl-chat-open, reveal the chrome as a semi-transparent
+ * RTL panel covering the window. Electron resizes wider via IPC so the
+ * native chat layout (sidebar + main column) has room to breathe.
+ * ===================================================================== */
+
+body.gl-chat-open .gl-companion-chrome {
+  /* The original wrapper is display:flex with a row layout (sidebar +
+     main column). `display: revert` falls back to <div>'s default which
+     is `block`, so we MUST set flex explicitly. */
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  position: fixed !important;
+  top: 28px !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: calc(100vh - 28px) !important;
+  z-index: 50000 !important;
+  background-color: rgba(15, 23, 42, 0.72) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  direction: rtl !important;
+  overflow: hidden !important;
+  pointer-events: auto !important;
+}
+
+/* Direct children of the chrome are the two flex panes (history sidebar
+   and main chat column). Force them to share the row equally. */
+body.gl-chat-open .gl-companion-chrome > * {
+  flex: 1 1 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+/* The sidebar is normally narrower than the main column — give it a
+   fixed width so the main chat column gets the rest. */
+body.gl-chat-open .gl-companion-chrome > *:first-child {
+  flex: 0 0 240px !important;
+  border-inline-start: 1px solid rgba(148, 163, 184, 0.2);
+}
+body.gl-chat-open .gl-companion-chrome > *:last-child {
+  flex: 1 1 auto !important;
+}
+
+/* RTL inside the chrome (most child layouts respect direction:rtl). */
+body.gl-chat-open .gl-companion-chrome,
+body.gl-chat-open .gl-companion-chrome * {
+  direction: rtl !important;
+}
+
+/* Restore button + bubble backgrounds inside the chat panel so widgets
+   are readable against the dark backdrop. */
+body.gl-chat-open .gl-companion-chrome button,
+body.gl-chat-open .gl-companion-chrome [role="button"],
+body.gl-chat-open .gl-companion-chrome input,
+body.gl-chat-open .gl-companion-chrome textarea,
+body.gl-chat-open .gl-companion-chrome select {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #f1f5f9 !important;
+  border-radius: 8px;
+}
+body.gl-chat-open .gl-companion-chrome button:hover,
+body.gl-chat-open .gl-companion-chrome [role="button"]:hover {
+  background-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+/* Speech / message bubbles get their own slightly stronger backdrop. */
+body.gl-chat-open .gl-companion-chrome [class*="bubble" i],
+body.gl-chat-open .gl-companion-chrome [class*="message" i] {
+  background-color: rgba(30, 41, 59, 0.55) !important;
+  border-radius: 12px !important;
+  padding: 6px 10px !important;
+  margin: 4px 0 !important;
+}
+
+/* Hide the chrome's own background <img> (defensive — already covered
+   by the global `img { display:none }` but we keep it explicit). */
+body.gl-chat-open .gl-companion-chrome img {
+  display: none !important;
+}
+
+/* When the chat panel is open, push the canvas behind it and dim it
+   slightly so the user's focus is on the chat. */
+body.gl-chat-open canvas {
+  opacity: 0.65 !important;
+  z-index: 1 !important;
 }
