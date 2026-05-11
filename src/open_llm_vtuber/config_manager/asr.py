@@ -281,6 +281,33 @@ class SherpaOnnxASRConfig(I18nMixin):
         return values
 
 
+class GeminiASRConfig(I18nMixin):
+    """Configuration for Gemini ASR (multimodal speech-to-text)."""
+
+    api_key: str = Field(..., alias="api_key")
+    model: str = Field("gemini-2.5-flash", alias="model")
+    language: Optional[str] = Field(None, alias="language")
+    prompt: Optional[str] = Field(None, alias="prompt")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "api_key": Description(
+            en="Google AI Studio API key", zh="Google AI Studio API 密钥"
+        ),
+        "model": Description(
+            en="Gemini model used for transcription (e.g., gemini-2.5-flash)",
+            zh="用于转写的 Gemini 模型",
+        ),
+        "language": Description(
+            en="Expected language hint (e.g., 'Arabic'); leave empty for auto",
+            zh="预期语言提示（如 'Arabic'）；留空则自动检测",
+        ),
+        "prompt": Description(
+            en="Override the default transcription instruction (advanced)",
+            zh="覆盖默认转写指令（高级选项）",
+        ),
+    }
+
+
 class ASRConfig(I18nMixin):
     """Configuration for Automatic Speech Recognition."""
 
@@ -292,6 +319,7 @@ class ASRConfig(I18nMixin):
         "fun_asr",
         "groq_whisper_asr",
         "sherpa_onnx_asr",
+        "gemini_asr",
     ] = Field(..., alias="asr_model")
     azure_asr: Optional[AzureASRConfig] = Field(None, alias="azure_asr")
     faster_whisper: Optional[FasterWhisperConfig] = Field(None, alias="faster_whisper")
@@ -304,6 +332,7 @@ class ASRConfig(I18nMixin):
     sherpa_onnx_asr: Optional[SherpaOnnxASRConfig] = Field(
         None, alias="sherpa_onnx_asr"
     )
+    gemini_asr: Optional[GeminiASRConfig] = Field(None, alias="gemini_asr")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "asr_model": Description(
@@ -323,6 +352,9 @@ class ASRConfig(I18nMixin):
         ),
         "sherpa_onnx_asr": Description(
             en="Configuration for Sherpa Onnx ASR", zh="Sherpa Onnx ASR 配置"
+        ),
+        "gemini_asr": Description(
+            en="Configuration for Gemini ASR", zh="Gemini ASR 配置"
         ),
     }
 
@@ -345,5 +377,7 @@ class ASRConfig(I18nMixin):
             values.groq_whisper_asr.model_validate(values.groq_whisper_asr.model_dump())
         elif asr_model == "SherpaOnnxASR" and values.sherpa_onnx_asr is not None:
             values.sherpa_onnx_asr.model_validate(values.sherpa_onnx_asr.model_dump())
+        elif asr_model == "gemini_asr" and values.gemini_asr is not None:
+            values.gemini_asr.model_validate(values.gemini_asr.model_dump())
 
         return values

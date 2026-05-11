@@ -135,6 +135,16 @@ class TTSFactory:
             from .sherpa_onnx_tts import TTSEngine as SherpaOnnxTTSEngine
 
             return SherpaOnnxTTSEngine(**kwargs)
+        elif engine_type == "gemini_tts":
+            from .gemini_tts import TTSEngine as GeminiTTSEngine
+
+            return GeminiTTSEngine(
+                api_key=kwargs.get("api_key"),
+                model=kwargs.get("model", "gemini-2.5-flash-preview-tts"),
+                voice_name=kwargs.get("voice_name", "Kore"),
+                language_code=kwargs.get("language_code", "ar-XA"),
+                style_prompt=kwargs.get("style_prompt"),
+            )
         elif engine_type == "openai_tts":
             from .openai_tts import TTSEngine as OpenAITTSEngine
 

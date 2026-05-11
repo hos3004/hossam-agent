@@ -58,5 +58,14 @@ class ASRFactory:
             from .sherpa_onnx_asr import VoiceRecognition as SherpaOnnxASR
 
             return SherpaOnnxASR(**kwargs)
+        elif system_name == "gemini_asr":
+            from .gemini_asr import VoiceRecognition as GeminiASR
+
+            return GeminiASR(
+                api_key=kwargs.get("api_key"),
+                model=kwargs.get("model", "gemini-2.5-flash"),
+                language=kwargs.get("language"),
+                prompt=kwargs.get("prompt"),
+            )
         else:
             raise ValueError(f"Unknown ASR system: {system_name}")
