@@ -7,26 +7,66 @@
  * desktop pet / overlay companion.
  *
  * Strategy:
- *   - Make the page background fully transparent.
- *   - Add a 28 px draggable strip at the very top (Electron region).
- *   - Hide the main React app's chrome elements via best-effort attribute
- *     selectors (sidebar / settings / toolbar / message list / etc.).
- *   - Stretch the Live2D <canvas> to fill the remaining area.
+ *   1. Nuke all background paint (image + color) on every element. The
+ *      React app sets a city-skyline background on a non-obvious div, so
+ *      a targeted rule isn't enough — we go scorched-earth and then
+ *      restore only the few elements that need a backdrop (speech bubble,
+ *      our overlay button, close pill).
+ *   2. Add a 28 px draggable strip at the very top (Electron region).
+ *   3. Hide chrome elements: top status bar, bottom control bar, sidebar,
+ *      settings panel, message list, chat input, etc.
+ *   4. Stretch the Live2D <canvas> to fill the remaining area.
  *
- * The selectors are intentionally generic. If the upstream frontend changes
- * its class names, the regression is purely cosmetic (some chrome may peek
- * through) — functionality (mic, Live Mode, transcripts) is unaffected.
+ * The selectors are intentionally generic. If upstream class names change,
+ * worst case is some chrome peeks through; functionality is unaffected.
  */
 
 html, body, #root {
   background: transparent !important;
+  background-image: none !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
   color-scheme: dark light;
 }
 
-/* ---- Drag handle: 28 px transparent strip at the top of the window ----- */
+/* ---- NUKE all backgrounds globally ------------------------------------ */
+/* All elements lose their background paint. We restore selectively below. */
+*,
+*::before,
+*::after {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* ---- Restore backgrounds for things that genuinely need one ---------- */
+.gl-overlay-root,
+.gl-overlay-root *,
+.gl-overlay-root *::before,
+.gl-overlay-root *::after {
+  background: revert !important;
+  background-image: revert !important;
+  box-shadow: revert !important;
+}
+
+.gl-companion-close {
+  background: rgba(244, 63, 94, 0.55) !important;
+}
+.gl-companion-close:hover {
+  background: rgba(244, 63, 94, 0.85) !important;
+}
+
+/* Speech bubbles / subtitles / AI message display: keep a soft dark backdrop */
+[class*="bubble" i],
+[class*="subtitle" i],
+[class*="caption" i],
+[class*="speech" i] {
+  background: rgba(15, 23, 42, 0.78) !important;
+  border-radius: 14px !important;
+}
+
+/* ---- Drag handle: 28 px transparent strip at the top of the window ---- */
 body::before {
   content: "";
   position: fixed;
@@ -37,6 +77,7 @@ body::before {
   z-index: 9999;
   -webkit-app-region: drag;
   app-region: drag;
+  background: transparent !important;
 }
 
 /* Interactive elements must not steal the drag region. */
@@ -46,31 +87,49 @@ canvas, .gl-overlay-root, .gl-overlay-root * {
   app-region: no-drag;
 }
 
-/* ---- Hide common chrome (best-effort attribute selectors) ------------- */
+/* ---- Hide chrome (best-effort selectors) ----------------------------- */
 nav, header, footer, aside {
   display: none !important;
 }
 
-[class*="sidebar" i],
-[class*="Sidebar"],
-[class*="settings-panel" i],
-[class*="SettingsPanel"],
-[class*="toolbar" i],
-[class*="Toolbar"],
+/* Top status / connection indicator (e.g. green "Connected" pill) */
+[class*="status" i],
+[class*="connection" i],
+[class*="connected" i],
 [class*="header-bar" i],
-[class*="footer-bar" i],
-[class*="message-list" i],
-[class*="MessageList"],
-[class*="chat-history" i],
-[class*="chat-input" i],
-[class*="ChatInput"],
-[class*="control-panel" i],
-[class*="ControlPanel"],
-[class*="config-panel" i] {
+[class*="top-bar" i] {
   display: none !important;
 }
 
-/* ---- Stretch the Live2D canvas to fill the window --------------------- */
+/* Bottom controls: chat input, mic mute, pause, idle pill, attachment */
+[class*="chat-input" i],
+[class*="ChatInput"],
+[class*="input-area" i],
+[class*="input-bar" i],
+[class*="footer-bar" i],
+[class*="bottom-bar" i],
+[class*="control-bar" i],
+[class*="control-panel" i],
+[class*="toolbar" i],
+[class*="action-bar" i],
+[class*="state-indicator" i],
+[class*="idle-button" i] {
+  display: none !important;
+}
+
+/* Settings / sidebar / config / history panels */
+[class*="sidebar" i],
+[class*="Sidebar"],
+[class*="settings" i],
+[class*="config-panel" i],
+[class*="history-panel" i],
+[class*="chat-history" i],
+[class*="message-list" i],
+[class*="MessageList"] {
+  display: none !important;
+}
+
+/* ---- Stretch the Live2D canvas to fill the window -------------------- */
 canvas {
   position: fixed !important;
   top: 28px !important;
@@ -80,14 +139,15 @@ canvas {
   width: 100vw !important;
   height: calc(100vh - 28px) !important;
   background: transparent !important;
+  pointer-events: auto !important;
 }
 
-/* Keep our Live Mode overlay button visible above everything. */
+/* ---- Live Mode overlay button stays on top of everything ------------- */
 .gl-overlay-root {
   z-index: 100000 !important;
 }
 
-/* Companion-mode "close" pill (added by companion-init.js). */
+/* ---- Companion-mode "close" pill (added by companion-init.js) -------- */
 .gl-companion-close {
   position: fixed;
   top: 4px;
@@ -96,8 +156,7 @@ canvas {
   height: 22px;
   border-radius: 50%;
   border: 0;
-  background: rgba(244, 63, 94, 0.18);
-  color: #fda4af;
+  color: #ffffff;
   font-size: 14px;
   line-height: 1;
   font-family: -apple-system, "Segoe UI", sans-serif;
@@ -108,6 +167,5 @@ canvas {
   transition: background 0.2s ease, transform 0.1s ease;
 }
 .gl-companion-close:hover {
-  background: rgba(244, 63, 94, 0.4);
   transform: scale(1.08);
 }
