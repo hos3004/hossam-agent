@@ -226,8 +226,6 @@ function createTray() {
 // ---------------------------------------------------------------------------
 // App lifecycle
 // ---------------------------------------------------------------------------
-app.commandLine.appendSwitch("disable-features", "OutOfBlinkCors");
-
 app.whenReady().then(async () => {
   console.log("[main] booting Hossam Agent Desktop");
   createTray();
