@@ -152,7 +152,7 @@ class SkillLoader:
             if skill.rules:
                 lines.append(f"**Key Rules:** {len(skill.rules)} rules defined")
             if skill.output_format:
-                lines.append(f"**Output format:** Defined in skill")
+                lines.append("**Output format:** Defined in skill")
             lines.append("")
 
         return "\n".join(lines)

@@ -1,0 +1,43 @@
+{
+  "name": "hossam-agent-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop companion shell for Hossam Agent (Open-LLM-VTuber + Gemini).",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:debug": "electron --inspect .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.hos3004.hossam-agent",
+    "productName": "Hossam Agent",
+    "directories": { "output": "dist" },
+    "files": [
+      "main.js",
+      "tray-icon.png",
+      "app-icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "../live_mode_overlay", "to": "live_mode_overlay" }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "app-icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
